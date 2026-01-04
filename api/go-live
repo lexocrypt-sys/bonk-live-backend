@@ -1,0 +1,44 @@
+import { AccessToken } from "livekit-server-sdk";
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  try {
+    const { wallet, isCreator } = req.body;
+
+    // 🔒 HARD GATE
+    if (!wallet || !isCreator) {
+      return res.status(403).json({ allowed: false });
+    }
+
+    // 🎥 Create LiveKit HOST token
+    const at = new AccessToken(
+      process.env.LIVEKIT_API_KEY,
+      process.env.LIVEKIT_API_SECRET,
+      {
+        identity: wallet,
+        name: wallet.slice(0, 4) + "..." + wallet.slice(-4),
+      }
+    );
+
+    at.addGrant({
+      room: "bonk-live-room",
+      roomJoin: true,
+      canPublish: true,
+      canSubscribe: true,
+    });
+
+    const token = at.toJwt();
+
+    return res.status(200).json({
+      allowed: true,
+      token,
+      url: process.env.LIVEKIT_URL,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+}
